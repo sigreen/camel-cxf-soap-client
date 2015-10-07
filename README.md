@@ -100,7 +100,7 @@ a test message using the request tool like so:
 
 #### SSL Configuration in Camel / CXF
 
-In the camel-context.xml, we configure SSL using tlcClientParameters.  The key pieces here are "disableCNCheck" - this eliminates hostname verification that is annoying when using localhost in development.  Also notice that I have co-located
+In the camel-context.xml, we configure SSL using tlsClientParameters.  The key pieces here are "disableCNCheck" - this eliminates hostname verification that is annoying when using localhost in development.  Also notice that I have co-located
 both my truststore and keystore in one JKS file to simplify things.
 
 ```
