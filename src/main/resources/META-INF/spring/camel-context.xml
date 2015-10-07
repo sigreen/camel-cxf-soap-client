@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Configures the Camel Context -->
+
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:cxf="http://camel.apache.org/schema/cxf"
+	xmlns:http="http://cxf.apache.org/transports/http/configuration"
+	xmlns:httpj="http://cxf.apache.org/transports/http-jetty/configuration"
+	xmlns:sec="http://cxf.apache.org/configuration/security"
+	xsi:schemaLocation="
+       http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+       http://camel.apache.org/schema/spring http://camel.apache.org/schema/spring/camel-spring.xsd
+       http://camel.apache.org/schema/cxf http://camel.apache.org/schema/cxf/camel-cxf.xsd
+       http://cxf.apache.org/transports/http/configuration http://cxf.apache.org/schemas/configuration/http-conf.xsd
+       http://cxf.apache.org/transports/http-jetty/configuration http://cxf.apache.org/schemas/configuration/http-jetty.xsd
+       http://cxf.apache.org/configuration/security http://cxf.apache.org/schemas/configuration/security.xsd">
+
+	<import resource="classpath:META-INF/cxf/cxf.xml" />
+	
+	<bean class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+		<property name="location">
+			<value>classpath:soap-config.properties</value>
+		</property>
+	</bean>
+
+	<!-- ======================================== CXF SOAP client endpoint ======================================== -->
+	<!-- Timeout configuration for CXF endpoint -->
+	<!-- Timeout value is hardcoded (to 1 minute) due to a bug in Spring or Cxf - the schema validation is done before --> 
+	<!-- replacing the property's value -->
+
+	<http:conduit name="*.http-conduit">
+		<http:tlsClientParameters disableCNCheck="${disableHostnameCheck}">
+			<sec:keyManagers keyPassword="${keystorePassword}">
+				<sec:keyStore type="JKS" password="${keystorePassword}"
+					file="${keystoreLocation}" />
+			</sec:keyManagers>
+			<sec:trustManagers>
+				<sec:keyStore type="JKS" password="${keystorePassword}"
+					file="${keystoreLocation}" />
+			</sec:trustManagers>
+			<sec:cipherSuitesFilter>
+				<!-- these filters ensure that a ciphersuite with export-suitable or 
+					null encryption is used, but exclude anonymous Diffie-Hellman key change 
+					as this is vulnerable to man-in-the-middle attacks -->
+				<sec:include>.*_EXPORT_.*</sec:include>
+				<sec:include>.*_EXPORT1024_.*</sec:include>
+				<sec:include>.*_WITH_DES_.*</sec:include>
+				<sec:include>.*_WITH_AES_.*</sec:include>
+				<sec:include>.*_WITH_NULL_.*</sec:include>
+				<sec:exclude>.*_DH_anon_.*</sec:exclude>
+			</sec:cipherSuitesFilter>
+		</http:tlsClientParameters>
+		<http:client AutoRedirect="true" Connection="Keep-Alive"
+			ReceiveTimeout="${connectionTimeout}" ConnectionTimeout="${connectionTimeout}"  />
+	</http:conduit>
+
+
+	<!-- Outgoing SOAP client endpoint -->
+	<cxf:cxfEndpoint id="cxfClientEndpoint"
+		address="${endpointAddress}"
+		wsdlURL="${wsdlAddress}"
+		endpointName="${portName}" serviceName="${serviceName}">
+		
+		<!-- The interceptors - needed to log the SOAP requests and responses -->
+		<!-- They can be removed, when no logging is needed -->
+		<cxf:inInterceptors>
+			<ref bean="loggingInInterceptor" />
+		</cxf:inInterceptors>
+		<cxf:outInterceptors>
+			<ref bean="loggingOutInterceptor" />
+		</cxf:outInterceptors>
+		<cxf:outFaultInterceptors>
+			<ref bean="loggingOutInterceptor" />
+		</cxf:outFaultInterceptors>
+		<cxf:inFaultInterceptors>
+			<ref bean="loggingInInterceptor" />
+		</cxf:inFaultInterceptors>
+	</cxf:cxfEndpoint>
+
+	<!-- Header filter strategy for not sending any Camel headers to SOAP endpoint -->
+	<bean id="cxfHeaderFilterStrategy" class="org.fusesource.client.soap.cxf.CxfHeaderFilterStrategy" />
+
+	<!-- The interceptors bean definitions - used for logging SOAP requests. -->
+	<!-- They can be removed, when no logging is needed -->
+	<bean id="abstractLoggingInterceptor" abstract="true">
+		<property name="prettyLogging" value="true" />
+	</bean>
+	<bean id="loggingInInterceptor" class="org.apache.cxf.interceptor.LoggingInInterceptor"
+		parent="abstractLoggingInterceptor" />
+	<bean id="loggingOutInterceptor" class="org.apache.cxf.interceptor.LoggingOutInterceptor"
+		parent="abstractLoggingInterceptor" />
+		
+	<bean id="soapRequestPojo" class="org.fusesource.client.soap.cxf.CreateSoapRequest"/>
+		
+	<!-- To enable logging SOAP requests and responses, you also need to create 
+		a file with name org.apache.cxf.Logger in folder /META-INF/cxf/ with one 
+		line of content: org.apache.cxf.common.logging.Log4jLogger This will use 
+		log4j to display soap messages, e.g. they will appear in ipla.log -->
+
+	<camelContext xmlns="http://camel.apache.org/schema/spring">
+
+		  <dataFormats>
+            <soapjaxb contextPath="net.webservicex" id="soapFormat"/>
+		  </dataFormats>
+
+		<route>
+			<from uri="timer://foo?repeatCount=1"/>
+			<setHeader headerName="fromCurrency">
+				<constant>USD</constant>
+			</setHeader>
+			<setHeader headerName="toCurrency">
+				<constant>AUD</constant>
+			</setHeader>
+			<bean ref="soapRequestPojo" method="createSoapBody"/>
+			<marshal ref="soapFormat"/>
+			<to uri="cxf:bean:cxfClientEndpoint?dataFormat=MESSAGE&amp;headerFilterStrategy=#cxfHeaderFilterStrategy" />
+		</route>
+	</camelContext>
+
+</beans>
