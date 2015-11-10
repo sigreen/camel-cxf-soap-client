@@ -89,7 +89,7 @@ Update the configuration properties to match your local development environment:
 
 ### Configuring SoapUI Mock Service (SOAP Server)
 
-Open SoapUI and import the project located at src/test/soapui/CurrencyCOnverterMockServer.xml.  Start by configuring the SSL preferences like so:
+Open SoapUI and import the project located at src/test/soapui/CurrencyCOnverterMockServer.xml.  Start by configuring the SSL preferences like so (password for JKS is Abcd1234):
 
  ![ssl preferences](docs/images/soapUI_sslSettings.png)
  
@@ -97,6 +97,8 @@ After you've updated the SSL settings and saved the preferences, start the mock 
 a test message using the request tool like so:
 
  ![ssl mockservice](docs/images/soapUI_startupMockService.png)
+ 
+ If you have configured the SSL service correctly, you should see `Tue Nov 10 07:58:43 EST 2015:INFO:Started SslSocketConnector@0.0.0.0:8443` appear in the jetty log tab.  Notice the port 8443 for SSL.
 
 #### SSL Configuration in Camel / CXF
 
